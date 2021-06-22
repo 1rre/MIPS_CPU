@@ -1,2 +1,9 @@
-**/*.bin
+**.bin
 **/test/build
+**.anno.json
+**/.bloop
+**/.metals
+**/.vscode
+**/*.fir
+chisel/mips_cpu
+chisel/out
