@@ -1,5 +1,5 @@
 #!/bin/bash
-
-mkdir -p .test
-gcc test/test.c -o .test/test.bin
-.test/test.bin $@
+rm -rf test/build
+mkdir -p test/build
+gcc test/test.c -o test/build/test.bin
+test/build/test.bin $@

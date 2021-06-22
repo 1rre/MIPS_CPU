@@ -1,24 +1,13 @@
 `timescale 1ps/1ps
 module mips_cpu_harvard (
-  /* Standard signals */
-  input logic     clk,
-  input logic     reset,
-  output logic    active,
-  output logic [31:0] register_v0,
-
-  /* New clock enable. See below. */
-  input logic     clk_enable,
-
-  /* Combinatorial read access to instructions */
-  output logic[31:0]  instr_address,
-  input logic[31:0]   instr_readdata,
-
-  /* Combinatorial read and single-cycle write access to instructions */
-  output logic[31:0]  data_address,
-  output logic        data_write,
-  output logic        data_read,
-  output logic[31:0]  data_writedata,
-  input logic[31:0]  data_readdata
+input
+  clk, reset, clk_enable,
+output
+  active, data_write, data_read,
+input [31:0]
+  instr_readdata, data_readdata,
+output [31:0]
+  register_v0, instr_address, data_address, data_writedata
 );
 
 reg   [4:0] read_addr0, read_addr1, write_addr;
@@ -51,13 +40,33 @@ always_ff @(posedge clk) begin
   end
 end
 
-harvard_fetch submod_fetch (
+// Submodules
+
+harvard_fetch stage0_fetch (
   .clk(clk),
   .reset(reset),
   .branch_en(1'b0),
   .pc(instr_address),
-  .pc_en(1'b1),
+  .enable(fetch),
   .branch(32'b0)
+);
+
+harvard_decode stage1_decode (
+  .clk(clk),
+  .reset(reset),
+  .enable(decode)
+);
+
+harvard_execute stage2_execute (
+
+);
+
+harvard_memory stage3_memory (
+
+);
+
+harvard_writeback stage4_writeback (
+
 );
 
 reg_file submod_registers (
@@ -68,12 +77,11 @@ reg_file submod_registers (
   // Addressing
   .read_addr0(read_addr0),
   .read_addr1(read_addr1),
-  .read_addr2(5'd2),
   .write_addr(write_addr),
   // Data
   .read_data0(read_data0),
   .read_data1(read_data1),
-  .read_data2(register_v0),
+  .register_v0(register_v0),
   .write_data(write_data)
 );
 
