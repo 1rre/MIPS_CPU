@@ -4,7 +4,7 @@ import chisel3._
 
 class RegFile extends Module {
   class RegFileIO extends Bundle {
-    val writeEn = Input(UInt(1.W))
+    val writeEn = Input(Bool())
     val readAddr0 = Input(UInt(5.W))
     val readAddr1 = Input(UInt(5.W))
     val writeAddr = Input(UInt(5.W))
@@ -15,11 +15,11 @@ class RegFile extends Module {
   }
   val io = IO(new RegFileIO)
   import io._
-  val r = Reg(Vec(32, UInt(32.W)))
+  val r = RegInit(Vec(32, UInt(32.W)),VecInit(Array.fill(32)(0.U)))
   registerV0 := r(2)
   readData0 := r(readAddr0)
   readData1 := r(readAddr1)
-  when(writeEn.asBool) {
+  when(writeEn.asBool && (writeAddr =/= 0.U)) {
     r(writeAddr) := writeData
   }
 }

@@ -19,9 +19,9 @@ assign immediate[15:0] = instruction[15:0];
 assign opcode[5:0] = instruction[31:26];
 assign fun[5:0] = instruction[5:0];
 assign rs = instruction[25:21];
-assign rd = instruction[20:15];
-assign rt = instruction[15:10];
-assign shift = instruction[10:5];
+assign rd = instruction[20:16];
+assign rt = instruction[15:11];
+assign shift = instruction[10:6];
 
 wire j_type, r_type, i_type;
 
@@ -32,7 +32,7 @@ assign i_type = !(j_type | r_type);
 
 // Update registers on a decode cycle
 always @(posedge clk) if (enable) begin
-  mem_active <= _mem_active;
+  mem_active <= _mem_act_mem_activeive;
   reg_active <= _reg_active;
 end
 
