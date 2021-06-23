@@ -18,83 +18,88 @@ class HarvardCPU extends Module {
   }
   val io = IO(HarvardIO)
   import io._
+
+  // Clock logic
   val clk = Wire(Clock())
-  val _clk = Wire(Bool())
-  _clk := (clock.asBool & clk_enable)
-  clk := _clk.asClock()
+  clk := (clock.asBool & clk_enable).asClock()
   override_clock = Some(clk)
 
-  val regReadAddr0 = WireInit(UInt(5.W), 0.U)
-  val regReadAddr1 = WireInit(UInt(5.W), 0.U)
-  val regWriteAddr = WireInit(UInt(5.W), 0.U)
-  val regReadData0 = WireInit(UInt(32.W), 0.U)
-  val regReadData1 = WireInit(UInt(32.W), 0.U)
   val regWriteData = RegInit(UInt(32.W), 0.U)
-  val branchAddr = RegInit(UInt(32.W), 0xBCE00000l.U)
+  val branchAddr = RegInit(UInt(32.W), 0.U)
 
-  val memActive = WireInit(Bool(), 0.U)
-  val regActive = WireInit(Bool(), 0.U)
+  // Inactive when instruction address becomes 0
+  active := instr_address =/= 0.U
 
+  // Current stage logic
   val stage = RegInit(UInt(5.W), 16.U)
-  def fetch = stage(0)
-  def decode = stage(1)
+  def fetch = stage(4)
+  def decode = stage(3)
   def execute = stage(2)
-  def memory = stage(3)
-  def writeback = stage(4)
+  def memory = stage(1)
+  def writeback = stage(0)
+  
+  // Cyclical stages (ignoring multi-cycle instructions for now)
+  stage := VecInit(memory, execute, decode, fetch, writeback).asUInt()
 
   // Registers
-  val regFile = Module(new RegFile)
+  val regFile = Module(new RegFile)  
+  val s0 = Module(new Fetch)
+  val s1 = Module(new Decode)
+  val s2 = Module(new Execute)
+  val s3 = Module(new MemoryWrite)
+  val s4 = Module(new WriteBack)
+
+  // Decode directly routed signals
+  import s1.io.{regActive, memActive,branchEn,destReg,srcReg0,srcReg1}
+
+  // Register directly routed signals
+  import regFile.io.registerV0
+  def regReadData0 = regFile.io.readData0
+  def regReadData1 = regFile.io.readData1
+  
+  // Register IO
   regFile.clock := clk
   regFile.reset := reset
-  regFile.io.readAddr0 := regReadAddr0
-  regFile.io.readAddr1 := regReadAddr1
-  regFile.io.writeAddr := regWriteAddr
-  regReadData0 := regFile.io.readData0
-  regReadData1 := regFile.io.readData1
+  regFile.io.readAddr0 := srcReg0
+  regFile.io.readAddr1 := srcReg1
+  regFile.io.writeAddr := srcReg1
   regFile.io.writeData := regWriteData
-  register_v0 := regFile.io.registerV0
-  regFile.io.writeEn := writeback
+  regFile.io.writeEn := writeback & regActive
 
-  val branchEn = WireInit(Bool(), 0.U)
-
-  // Fetch stage
-  val s0 = Module(new Fetch)
+  // Fetch IO
   s0.clock := clk
   instr_address := s0.io.pc
-  s0.io.branchEn := branchEn
   s0.io.enable := fetch
   s0.io.branchAddr := branchAddr
+  s0.io.branchEn := branchEn
 
-  // Decode stage
-  val s1 = Module(new Decode)
+  // Decode IO
   s1.clock := clk
   s1.reset := reset
   s1.io.enable := decode
-  regWriteAddr := s1.io.destReg
-  regReadAddr0 := s1.io.srcReg0
-  regReadAddr1 := s1.io.srcReg1
-  memActive := s1.io.memActive
-  regActive := s1.io.regActive
-  branchEn := s1.io.branchEn
   s1.io.instruction := instr_readdata
 
-  // Stages aren't skipped so pipelining can work better
-  when (reset.asBool()) {
-    stage := 16.U
-  } otherwise {
-    when (writeback) {
-      stage := stage << 4
-    } otherwise {
-      stage := stage >> 1
-    }
-  }
+  // Execute IO
+  s2.clock := clk
+  s2.reset := reset
 
-  regWriteData := data_readdata | regReadAddr0 | regReadAddr1 //DELETE THIS
+  // Memory write IO
+  s3.clock := clk
+  s3.reset := reset
+
+  // Writeback IO
+  s4.clock := clk
+  s4.reset := reset
+
+  // Module IO
+  register_v0 := registerV0
+  data_write := memory & memActive
+
+  // TO BE DELETED
+  regWriteData := data_readdata | srcReg0 | srcReg1 //DELETE THIS
   data_writedata := stage //DELETE THIS  
   
   // TEMP ASSIGNMENTS
-  active := 1.U
-  data_write := 0.U
   data_read := 0.U
   data_address := 0.U
   
