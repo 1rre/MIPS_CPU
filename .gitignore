@@ -7,3 +7,4 @@
 **/*.fir
 chisel/mips_cpu
 chisel/out
+chisel/.dotty-ide-disabled
