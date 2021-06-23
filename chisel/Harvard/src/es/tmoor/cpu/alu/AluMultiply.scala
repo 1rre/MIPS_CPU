@@ -16,60 +16,46 @@ class AluMultiply extends Module {
   val io = IO(AluMultiplyIO)
   import io._
 
-  val mulIn0 = Wire(UInt(16.W))
-  val mulIn1 = Wire(UInt(16.W))
   val dataIn0Reg = Reg(UInt(32.W))
   val dataIn1Reg = Reg(UInt(32.W))
   val dataIn0Wire = Wire(UInt(32.W))
   val dataIn1Wire = Wire(UInt(32.W))
-  val s0 = WireInit(Bool(), 0.B)
-  val s1 = RegInit(Bool(), 0.B)
-  val s2 = RegInit(Bool(), 0.B)
-  val s3 = RegInit(Bool(), 0.B)
+  val s = RegInit(UInt(6.W), 63.U)
+  val result64 = RegInit(UInt(64.W), 0.U)
+  hiOut := result64(63,32)
+  loOut := result64(31,0)
 
-  when(beginOp) (dataIn0Reg := dataIn0)
-  when(beginOp) (dataIn1Reg := dataIn1)
+  when (beginOp) (dataIn0Reg := dataIn0)
+  when (beginOp) (dataIn1Reg := dataIn1)
 
-  when(beginOp) (dataIn0Wire := dataIn0) otherwise (dataIn0Wire := dataIn0Reg)
-  when(beginOp) (dataIn1Wire := dataIn1) otherwise (dataIn1Wire := dataIn1Reg)
-
-  s0 := beginOp
-  s1 := s0
-  s2 := s1
-  s3 := s2
-
-  val r = RegInit(UInt(64.W), 0.U)
-
-  when(s0) {
-    mulIn0 := dataIn0Wire(15,0)
-    mulIn1 := dataIn1Wire(15,0)
-    r := mulIn0 * mulIn1
-  } otherwise (when (s1) {
-    mulIn0 := dataIn0Wire(31,16)
-    mulIn1 := dataIn1Wire(15,0)
-    r := r + ((mulIn0 * mulIn1) << 8)
-  } otherwise (when (s2) {
-    mulIn0 := dataIn0Wire(15,0)
-    mulIn1 := dataIn1Wire(31,16)
-    r := r + ((mulIn0 * mulIn1) << 8)
-  } otherwise (when (s3) {
-    mulIn0 := dataIn0Wire(31,16)
-    mulIn1 := dataIn1Wire(31,16)
-    r := r + ((mulIn0 * mulIn1) << 16)
-  } otherwise {
-    mulIn0 := 0.U
-    mulIn1 := 0.U
-    r := 0.U
-  })))
-  
-  
-  hiOut := r(63,32)
-  loOut := r(31,0)
+  when (beginOp) (dataIn0Wire := dataIn0) otherwise (dataIn0Wire := dataIn0Reg)
+  when (beginOp) (dataIn1Wire := dataIn1) otherwise (dataIn1Wire := dataIn1Reg)
 
   val loDone = RegInit(Bool(), 0.B)
   val hiDone = RegInit(Bool(), 0.B)
-  loDone := s2
-  hiDone := s3
-  hiReady := hiDone
+
   loReady := loDone
+  hiReady := hiDone
+
+  when (s < 63.U) {
+    printf(p"hi: $hiOut\nlo: $loOut\ns: $s\n")
+    s := s - 1.U
+    when (dataIn1Reg(s)) {
+      result64 := (result64 << 1) + dataIn0Wire
+    } otherwise {
+      result64 := (result64 << 1)
+    }
+  }
+  when (s === 0.U) {
+    loDone := 1.B
+    hiDone := 1.B
+  }
+
+  when (beginOp) {
+    s := 31.U
+    loDone := 0.B
+    hiDone := 0.B
+    result64 := 0.U
+  }
+
 }

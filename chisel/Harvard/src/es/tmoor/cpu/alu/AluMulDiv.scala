@@ -20,6 +20,10 @@ class AluMulDiv extends Module {
 
   val waitHi = RegInit(Bool(), 0.B)
   val waitLo = RegInit(Bool(), 0.B)
+  hiReady := ~waitHi
+  loReady := ~waitLo
+
+  val arithError = RegInit(Bool(), 0.B)
 
   val lastOp = RegInit(Bool(), opIn)
   when (beginOp) {
@@ -43,14 +47,8 @@ class AluMulDiv extends Module {
   div.io.beginOp := beginOp & !opIn
   div.io.dataIn0 := dataIn0
   div.io.dataIn1 := dataIn1
-
-  when (lastOp) {
-    hiReady := mul.io.loReady
-    loReady := mul.io.hiReady
-  }
-
-  hiReady := mul.io.hiReady
-
+  arithError := div.io.divBy0
+  
   // Only overwrite hi/lo with mul.hi/mul.lo if the last op was mul
   when (mul.io.hiReady & lastOp) {
     hi := mul.io.hiOut
