@@ -20,7 +20,8 @@ class AluMultiply extends Module {
   val dataIn1Reg = Reg(UInt(32.W))
   val dataIn0Wire = Wire(UInt(32.W))
   val dataIn1Wire = Wire(UInt(32.W))
-  val s = RegInit(UInt(6.W), 63.U)
+  val d0s = RegInit(Bool(), 0.B)
+  val d1s = RegInit(Bool(), 0.B)
   val result64 = RegInit(UInt(64.W), 0.U)
   hiOut := result64(63,32)
   loOut := result64(31,0)
@@ -36,26 +37,53 @@ class AluMultiply extends Module {
 
   loReady := loDone
   hiReady := hiDone
+  
+  val mulIn0 = WireInit(UInt(16.W), 0.U)
+  val mulIn1 = WireInit(UInt(16.W), 0.U)
+  val multiplyOut = WireInit(UInt(32.W), 0.U)
 
-  when (s < 63.U) {
-    printf(p"hi: $hiOut\nlo: $loOut\ns: $s\n")
-    s := s - 1.U
-    when (dataIn1Reg(s)) {
-      result64 := (result64 << 1) + dataIn0Wire
-    } otherwise {
-      result64 := (result64 << 1)
-    }
-  }
-  when (s === 0.U) {
-    loDone := 1.B
-    hiDone := 1.B
-  }
+  multiplyOut:= mulIn0 * mulIn1
+
+  d0s := ~d1s
+  d1s := d0s
+
+  printf(p"$d0s $d1s\n${Binary(result64)}\n")
 
   when (beginOp) {
-    s := 31.U
+    d0s := 0.B
+    d1s := 0.B
+    result64 := 0.U
+    mulIn0 := dataIn0Wire(15,0)
+    mulIn1 := dataIn1Wire(15,0)
     loDone := 0.B
     hiDone := 0.B
-    result64 := 0.U
   }
 
+  when (d0s & d1s) {
+    hiDone := 1.B
+  } otherwise when (d1s) {
+    loDone := 1.B
+  }
+
+  when (d0s) {
+    mulIn0 := dataIn0Wire(31,16)
+  } otherwise {
+    mulIn0 := dataIn0Wire(15,0)
+  }
+  
+  when (d1s) {
+    mulIn1 := dataIn1Wire(31,16)
+  } otherwise {
+    mulIn1 := dataIn1Wire(15,0)
+  }
+
+  when (d0s & d1s) {
+    result64 := result64 + (multiplyOut << 32)
+  } otherwise (when (d1s) {
+    result64 := result64 + (multiplyOut << 16)
+  } otherwise (when (d0s) {
+    result64 := result64 + (multiplyOut << 16)
+  } otherwise ({
+    result64 := multiplyOut
+  })))
 }

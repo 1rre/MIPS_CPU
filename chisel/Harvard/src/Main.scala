@@ -9,5 +9,6 @@ object Main extends App with chisel3.BackendCompilationUtilities {
       "-o", "mips_cpu/HarvardCPU.v"
     )
   )*/
-  new ChiselStage().emitVerilog(new alu.AluMulDiv, Array("-o", "mips_cpu/HarvardCPU"))
+  //new ChiselStage().emitVerilog(new alu.AluMulDiv, Array("-o", "mips_cpu/HarvardCPU"))
+  new ChiselStage().emitVerilog(new alu.AluMultiply, Array("-o", "test/AluMultiply.v"))
 }
