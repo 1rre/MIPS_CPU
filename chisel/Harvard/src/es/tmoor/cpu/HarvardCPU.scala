@@ -2,6 +2,7 @@ package es.tmoor.cpu
 
 import chisel3._
 import stages._
+import chisel3.util.MuxCase
 
 class HarvardCPU extends Module {
   object HarvardIO extends Bundle {
@@ -31,15 +32,17 @@ class HarvardCPU extends Module {
   active := instr_address =/= 0.U
 
   // Current stage logic
-  val stage = RegInit(UInt(5.W), 16.U)
+  def sFetch = 16.U
+  def sDecode = 8.U
+  def sExecute = 4.U
+  def sMemory = 2.U
+  def sWriteback = 1.U
+  val stage = RegInit(UInt(5.W), sFetch)
   def fetch = stage(4)
   def decode = stage(3)
   def execute = stage(2)
   def memory = stage(1)
   def writeback = stage(0)
-  
-  // Cyclical stages (ignoring multi-cycle instructions for now)
-  stage := VecInit(memory, execute, decode, fetch, writeback).asUInt()
 
   // Registers
   val regFile = Module(new RegFile)  
@@ -58,50 +61,50 @@ class HarvardCPU extends Module {
   def regReadData1 = regFile.io.readData1
   
   // Register IO
-  regFile.clock := clk
-  regFile.reset := reset
   regFile.io.readAddr0 := srcReg0
   regFile.io.readAddr1 := srcReg1
-  regFile.io.writeAddr := srcReg1
+  regFile.io.writeAddr := destReg
   regFile.io.writeData := regWriteData
   regFile.io.writeEn := writeback & regActive
 
   // Fetch IO
-  s0.clock := clk
   instr_address := s0.io.pc
   s0.io.enable := fetch
   s0.io.branchAddr := branchAddr
   s0.io.branchEn := branchEn
 
   // Decode IO
-  s1.clock := clk
-  s1.reset := reset
   s1.io.enable := decode
   s1.io.instruction := instr_readdata
 
   // Execute IO
-  s2.clock := clk
-  s2.reset := reset
+  s2.io.fun := s1.fun
+  s2.io.input0 := s1.io.instruction
+  s2.io.input1 := s1.io.instruction
+  // Assuming rt <= readData1
+  data_writedata := regFile.io.readData1
+  regWriteData := Mux(memActive, 0.U, s2.io.output)
+  data_address := s2.io.output
+  import s2.io.hold
 
   // Memory write IO
-  s3.clock := clk
-  s3.reset := reset
 
   // Writeback IO
-  s4.clock := clk
-  s4.reset := reset
 
   // Module IO
   register_v0 := registerV0
   data_write := memory & memActive
 
-  // TO BE DELETED
-  regWriteData := data_readdata | srcReg0 | srcReg1 //DELETE THIS
-  data_writedata := stage //DELETE THIS  
+  // Cyclical stages (ignoring multi-cycle instructions for now)
+  stage := MuxCase (sFetch, Seq (
+    fetch -> sDecode,
+    (decode || execute && hold) -> sExecute,
+    (execute && memActive) -> sMemory,
+    ((memory || execute) && regActive) -> sWriteback
+  ))
   
   // TEMP ASSIGNMENTS
   data_read := 0.U
-  data_address := 0.U
   
 }
 
