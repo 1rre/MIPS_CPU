@@ -1,4 +1,4 @@
-package es.tmoor.cpu.alu
+package es.tmoor.cpu.stages.execute
 
 import chisel3._
 
@@ -46,8 +46,6 @@ class AluMultiply extends Module {
 
   d0s := ~d1s
   d1s := d0s
-
-  printf(p"$d0s $d1s\n${Binary(result64)}\n")
 
   when (beginOp) {
     d0s := 0.B

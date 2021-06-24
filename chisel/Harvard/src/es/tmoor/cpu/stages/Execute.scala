@@ -1,7 +1,8 @@
 package es.tmoor.cpu
 package stages
-import alu._
-import FunctionCodes._
+
+import Opcodes._,JType._,RType._,IType._
+import execute._
 
 import chisel3._
 
@@ -24,7 +25,7 @@ class Execute extends Module {
   val result = RegInit(UInt(32.W), 0.U)
   output := result
   def resultWhen(f: UInt, res: UInt) = when (fun === f) (result := res)
-  resultWhen(add | addu, input0 + input1)
+  resultWhen(addu, input0 + input1)
   resultWhen(and, input0 & input1)
   resultWhen(mfhi, alu.io.hiOut)
   resultWhen(mflo, alu.io.loOut)
@@ -34,6 +35,6 @@ class Execute extends Module {
   resultWhen(sra | srav, (input0.asSInt >> input1).asUInt)
   resultWhen(sltu, (input0 < input1).asUInt)
   resultWhen(slt, (input0.asSInt < input1.asSInt).asUInt)
-  resultWhen(sub | subu, input0 - input1)
+  resultWhen(subu, input0 - input1)
   resultWhen(xor, input0 ^ input1)
 }

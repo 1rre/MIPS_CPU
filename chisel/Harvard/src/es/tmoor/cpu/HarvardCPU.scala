@@ -25,7 +25,7 @@ class HarvardCPU extends Module {
   clk := (clock.asBool & clk_enable).asClock()
   override_clock = Some(clk)
 
-  val regWriteData = RegInit(UInt(32.W), 0.U)
+  val regWriteData = WireInit(UInt(32.W), 0.U)
   val branchAddr = RegInit(UInt(32.W), 0.U)
 
   // Inactive when instruction address becomes 0
@@ -50,10 +50,14 @@ class HarvardCPU extends Module {
   val s1 = Module(new Decode)
   val s2 = Module(new Execute)
   val s3 = Module(new MemoryWrite)
+  // I don't think this module is needed
   val s4 = Module(new WriteBack)
 
+  val branchEn = Wire(Bool())
+  branchEn := 0.B
+
   // Decode directly routed signals
-  import s1.io.{regActive, memActive,branchEn,destReg,srcReg0,srcReg1}
+  import s1.io.{regActive, memActive,jumpEn,destReg,srcReg0,srcReg1}
 
   // Register directly routed signals
   import regFile.io.registerV0
@@ -65,46 +69,44 @@ class HarvardCPU extends Module {
   regFile.io.readAddr1 := srcReg1
   regFile.io.writeAddr := destReg
   regFile.io.writeData := regWriteData
-  regFile.io.writeEn := writeback & regActive
+  regFile.io.writeEn := fetch & regActive
 
   // Fetch IO
   instr_address := s0.io.pc
   s0.io.enable := fetch
   s0.io.branchAddr := branchAddr
-  s0.io.branchEn := branchEn
+  s0.io.pcChangeEn := branchEn | jumpEn
 
   // Decode IO
   s1.io.enable := decode
-  s1.io.instruction := instr_readdata
+  s1.io.instructionIn := instr_readdata
 
   // Execute IO
-  s2.io.fun := s1.fun
-  s2.io.input0 := s1.io.instruction
-  s2.io.input1 := s1.io.instruction
-  // Assuming rt <= readData1
-  data_writedata := regFile.io.readData1
-  regWriteData := Mux(memActive, 0.U, s2.io.output)
+  s2.io.fun := s1.io.funcode
+  s2.io.input0 := s1.io.instructionIn
+  s2.io.input1 := s1.io.instructionIn
+  regWriteData := Mux(s1.io.writeEn, data_readdata, s2.io.output)
   data_address := s2.io.output
   import s2.io.hold
 
   // Memory write IO
-
-  // Writeback IO
+  data_read := s1.io.readEn && memory
+  data_write := s1.io.writeEn && memory
+  // Assuming rt <= readData1
+  s3.io.dataIn := regFile.io.readData1
+  s3.io.sExt := s1.io.memSExt
+  s3.io.byteEn := s1.io.memByteEn
+  io.data_writedata := s3.io.dataOut
 
   // Module IO
   register_v0 := registerV0
-  data_write := memory & memActive
 
   // Cyclical stages (ignoring multi-cycle instructions for now)
   stage := MuxCase (sFetch, Seq (
     fetch -> sDecode,
     (decode || execute && hold) -> sExecute,
     (execute && memActive) -> sMemory,
-    ((memory || execute) && regActive) -> sWriteback
-  ))
-  
-  // TEMP ASSIGNMENTS
-  data_read := 0.U
-  
+    ((memory || execute) && regActive) -> sFetch
+  ))  
 }
 
